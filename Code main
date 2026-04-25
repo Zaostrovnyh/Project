@@ -1,0 +1,166 @@
+from win32gui import GetForegroundWindow
+from AppOpener import close
+from controller import reader
+import os, time, psutil, datetime, win32process
+import_file = reader()
+open("main.pid", "w").write(str(os.getpid()))
+white_list = import_file[0]
+Black_list = import_file[1]
+mode = import_file[4]
+flag_all_block = False
+block_timer = 3600
+inde = "flag"
+block = False
+block_list = [["chrome", 10]]
+block_times = []
+process_time=[]
+read_file = open('text.txt', 'r')
+old_base = read_file.read().split('\n')
+new_base = []
+for lists in old_base:
+    new_base.append(lists)
+today = datetime.date.today()
+print(new_base, today)
+if str(today) in new_base:
+    process_time.append([str(today)])
+    ind = new_base.index(str(today)) + 1
+    while True:
+
+        if ind >= len(new_base):
+            break
+        if len(new_base[ind].split(" ")) == 1:
+            break
+        ape_list = [new_base[ind].split(" ")[0] + " "]
+        process_time.append(ape_list)
+        process_time[process_time.index(ape_list)].append(int(new_base[ind].split(" ")[1]))
+        print(new_base[ind])
+        ind+=1
+else:
+    process_time.append([])
+    process_time[0].append(str(today))
+flag = True
+timestamp = {}
+count = 0
+mode_flag = False
+start = time.time()
+while True:
+
+    read_file = open('text.txt', 'r')
+    old_base = read_file.read().split('\n')
+    new_base = []
+    for lists in old_base:
+        if lists != ['\n'] and lists != [" "] and lists not in new_base:
+            new_base.append(lists)
+    today = datetime.date.today()
+    if [str(today)] in new_base and [str(today)] not in process_time:
+        process_time.append([str(today)])
+        ind = new_base.index([str(today)]) + 1
+        while True:
+            if len(new_base[ind]) == 1:
+                break
+            if len(new_base[ind]) == 0:
+                ind += 1
+                pass
+            process_time.append(new_base[ind])
+            ind += 1
+    try:
+        current_app = psutil.Process(win32process.GetWindowThreadProcessId(GetForegroundWindow())[1]).name().replace(".exe", "")
+        timestamp[current_app] = int(time.time())
+        end = time.time()
+        if end - start >= 1:
+            times = list(map(int, str(datetime.datetime.now(datetime.timezone.utc)).split(" ")[1][
+                                  :str(datetime.datetime.now(datetime.timezone.utc)).split(" ")[1].index(".")].split(":")))
+            start = time.time()
+            for lists in process_time:
+                if current_app + " " not in lists:
+                    count+=1
+            if count == len(process_time):
+                if [] in process_time:
+                    process_time.remove([])
+                process_time.append([current_app + " ", 0])
+            count = 0
+
+            with open('text.txt', 'w') as testfile:
+                for lists in process_time:
+                    if len(lists) == 1 and lists not in new_base and lists[0] not in new_base:
+                        new_base.append(lists)
+                if process_time[0] not in new_base:
+                    for lists in process_time:
+                        if len(lists) != 1:
+                            if lists[0] + str(lists[1]) in new_base and current_app + " " == lists[0]:
+                                new_base.remove(lists[0] + str(lists[1]))
+
+                            lists[1] += 1
+                            new_base.append(lists)
+                            lists[1] -= 1
+                print(process_time)
+                for i in range(0, len(process_time)):
+                    if current_app + " " in process_time[i]:
+                        process_time[i][1] = int(process_time[i][1]) + 1
+
+                for row in new_base:
+                    testfile.write(''.join([str(i) for i in row]) + '\n')
+            if mode == "Расписание белый список":
+                if str(times[0]) + ":" + str(times[1]) in block_times:
+                    if block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "T":
+                        block = True
+                    elif block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "F":
+                        block = False
+                if block and current_app not in white_list:
+                    close(current_app[:len(lists(current_app)) - 2])
+            if mode == "Соответствие":
+                for lists in block_list:
+                    if current_app in lists:
+                        inde = block_list.index(lists)
+                if inde != "flag":
+                    for lists in process_time:
+                        if current_app in lists and int(lists[1])>=block_list[inde][1] and block_list[inde][0] == current_app:
+                            close(current_app)
+                            end = time.process_time()
+                            start = 0
+                else:
+                    close(current_app)
+            if mode == "Расписание белый список":
+                if str(times[0]) + ":" + str(times[1]) in block_times:
+                    if block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "T":
+                        block = True
+                    elif block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "F":
+                        block = False
+                if block and current_app not in white_list:
+                    close(current_app[:len(list(current_app)) - 2])
+            if mode == "Расписание чёрный список":
+                if str(times[0]) + ":" + str(times[1]) in block_times:
+                    if block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "T":
+                        block = True
+                    elif block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "F":
+                        block = False
+                if block and current_app in Black_list:
+                    close(current_app[:len(list(current_app)) - 2])
+            if mode == "Расписание беспощадный блок":
+                if str(times[0]) + ":" + str(times[1]) in block_times:
+                    if block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "T":
+                        block = True
+                    elif block_times[block_times.index(str(times[0]) + ":" + str(times[1])) + 1] == "F":
+                        block = False
+                if block:
+                    close(current_app[:len(list(current_app)) - 2])
+            if mode == "Таймер Чёрный список" and current_app in Black_list:
+                for lists in process_time:
+                    if current_app in lists and int(lists[1]) >= block_timer:
+                        close(current_app[:len(list(current_app)) - 2])
+                        end = time.process_time()
+                        start = 0
+            if mode == "Беспощадный полный блок":
+                all_time = 0
+                if flag_all_block:
+                    close(current_app[:len(list(current_app)) - 2])
+                else:
+                    for lists in process_time:
+                        all_time+=lists[1]
+                        if all_time >= block_timer:
+                            flag_all_block = True
+                            close(current_app[:len(list(current_app)) - 2])
+
+    except:
+        pass
+        print("Ошибка")
