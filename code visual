@@ -1,0 +1,301 @@
+import winreg
+import psutil
+import flet as ft
+from controller import reader, writer, find_process, normalize
+import_file = reader()
+white_list = import_file[0]
+Black_list = import_file[1]
+pin_code = import_file[2]
+pin_symb = import_file[3]
+mode = import_file[4]
+flag = True
+timestamp = {}
+count = 0
+mode_list = ["Соответствие", "Расписание белый список", "Расписание белый список", "Расписание чёрный список",
+             "Расписание беспощадный блок", "Таймер Чёрный список", "Беспощадный полный блок"]
+mode_flag = False
+app = "Приложение не было найдено!"
+
+def main(page):
+    global Black_list, pin_symb
+    writer()
+    page.clean()
+    def pin_check(function, check):
+        global pin_code, pin_symb, white_list
+        def check_code():
+            checking = text.value
+            if checking == pin_code:
+                if check == False:
+                    function(page)
+                else:
+                    function(page, check)
+            else:
+                def tr_main():
+                    main(page)
+                page.clean()
+                page.add(ft.Text("Код введён неправильно!"), ft.Button("Вернуться в главное", on_click = tr_main))
+
+        if pin_symb == "🔓":
+            if check == False:
+                function(page)
+            else:
+                function(page, check)
+
+        else:
+            page.clean()
+            text = ft.TextField(label="Введите пин-код")
+            page.add(text, ft.Button("Подтвердить", on_click=check_code))
+    def auto_searchW():
+        pin_check(output, "W")
+    def auto_search():
+        pin_check(output, "B")
+    def manualW():
+        pin_check(manual_input, "W")
+    def manual():
+        pin_check(manual_input, "B")
+
+    def trigger_see_the_list():
+        pin_check(see_the_list, False)
+
+    def check_list():
+        print(Black_list, mode, white_list, pin_code)
+
+    def trigger_change_mode():
+        pin_check(change_mode, False)
+    def switch():
+        global pin_code, pin_symb
+        if pin_symb == "🔓":
+            pin_symb = "🔒"
+            if pin_code != "F":
+                def new_code():
+                    global pin_code
+                    pin_code = text.value
+                    main(page)
+                page.clean()
+                text = ft.TextField(label="Создайте пин-код")
+                page.add(text, ft.Button("Подтвердить", on_click=new_code))
+            else:
+                main(page)
+        elif pin_symb == "🔒":
+            def pin():
+                global pin_symb
+                pin_symb = "🔓"
+            pin_check(pin, False)
+
+
+
+    page.add(ft.Text("Выберите какое действие хотите совершить:"),
+             ft.Row([ft.Button("Добавить процесс в чёрный список автоматическим поиском процесса по названию приложения (имеются недочёты)",
+                               on_click=auto_search),
+                     ft.Button(
+                         "Добавить процесс в чёрный спискок ручным вводом имени процесса, который хотите ограничить \n (работает идеально, но необходимо знать название процесса, \n который вызывается приложением)",
+                         on_click=manual)]),
+             ft.Row([ft.Button("Просмотр списка всех запущенных процессов", on_click=trigger_see_the_list),
+                     ft.Button("Чееек", on_click=check_list),
+             ft.Button("Выбрать режим работы", on_click=trigger_change_mode)]),
+    ft.Row([ft.Button(
+        "Добавить процесс в белый список автоматическим поиском процесса по названию приложения (имеются недочёты)",
+        on_click=auto_searchW),
+            ft.Button(
+                "Добавить процесс в белый спискок ручным вводом имени процесса, который хотите ограничить \n (работает идеально, но необходимо знать название процесса, \n который вызывается приложением)",
+                on_click=manualW)]),
+             ft.Button(pin_symb, on_click = switch))
+
+
+
+def change_mode(page):
+    global mode, mode_list
+    cl = ft.Column(
+        spacing=2,
+        height=650,
+        width=500,
+        scroll=ft.ScrollMode.ALWAYS
+    )
+    page.clean()
+    def func(e):
+        global mode
+        def trigger_main():
+            main(page)
+        page.clean()
+        string = ''
+        for element in list(e.control.content):
+            try:
+                element = int(element)
+                string += str(element)
+            except:
+                break
+        mode = mode_list[int(string) - 1]
+
+        page.add(ft.Text("Выбранный вами режим - " + mode),
+                 ft.Button("Вернуться в главное", on_click = trigger_main))
+    count = 1
+    page.add(ft.Text("Выберите режим:"))
+    for mode in mode_list:
+        cl.controls.append(ft.Button(str(count) + ". " + mode, on_click=func))
+        page.update()
+        count += 1
+    page.add(cl)
+
+
+def foo(hive, flag):
+    aReg = winreg.ConnectRegistry(None, hive)
+    aKey = winreg.OpenKey(aReg, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+                          0, winreg.KEY_READ | flag)
+
+    count_subkey = winreg.QueryInfoKey(aKey)[0]
+
+    software_list = []
+
+    for i in range(count_subkey):
+        software = {}
+        try:
+            asubkey_name = winreg.EnumKey(aKey, i)
+            asubkey = winreg.OpenKey(aKey, asubkey_name)
+            software['name'] = winreg.QueryValueEx(asubkey, "DisplayName")[0]
+
+            try:
+                software['version'] = winreg.QueryValueEx(asubkey, "DisplayVersion")[0]
+            except EnvironmentError:
+                software['version'] = 'undefined'
+            try:
+                software['publisher'] = winreg.QueryValueEx(asubkey, "Publisher")[0]
+            except EnvironmentError:
+                software['publisher'] = 'undefined'
+            software_list.append(software)
+        except EnvironmentError:
+            continue
+
+    return software_list
+
+
+def output(page, check):
+    global app
+    cl = ft.Column(
+        spacing=2,
+        height=650,
+        width=500,
+        scroll=ft.ScrollMode.ALWAYS
+    )
+
+    flag = True
+    page.clean()
+
+    def func(e):
+        global app, flag, Black_list
+        string = ''
+        app = False
+        for element in list(e.control.content):
+            try:
+                element = int(element)
+                string += str(element)
+            except:
+                break
+        app = find_process(software_list[int(string) - 1]['name'])
+        if app != False and check == "B":
+            print(app)
+            page.clean()
+
+            page.add(ft.Text("Выбранный вами процесс - " + app),
+                     ft.Row(ft.Button("Добавить в чёрный список"), on_click = InB),
+                     ft.Button("Вернуться в главное БЕЗ ДОБАВЛЕНИЯ", on_click=stop))
+            flag = False
+        elif app != False and check == "W":
+            page.add(ft.Text("Выбранный вами процесс - " + app),
+                     ft.Button("Добавить процесс в белый список", on_click = InW),
+                     ft.Button("Вернуться в главное БЕЗ ДОБАВЛЕНИЯ", on_click=stop))
+        else:
+            page.clean()
+            page.add(ft.Text("Процесс не найден"), ft.Button("Вернуться в главное", on_click=stop))
+    def InB():
+        global Black_list, app
+        Black_list.append(app)
+    def InW():
+        global white_list, app
+        white_list.append(app)
+    def stop():
+        main(page)
+        return False
+
+    software_list = foo(winreg.HKEY_LOCAL_MACHINE, winreg.KEY_WOW64_32KEY)
+    count = 1
+    page.add(ft.Text("Выберите приложение:"))
+    for software in software_list:
+        if "'Microsoft" in str(software).split() or "Microsoft" in str(software).split():
+            software_list.remove(software)
+            continue
+        cl.controls.append(ft.Button(str(count) + ". " + software['name'], on_click=func))
+        page.update()
+        count += 1
+    print(count)
+    page.add(
+        ft.Container(cl, border=ft.Border.all(1)),
+    )
+
+
+def manual_input(page, check):
+
+    list_names = []
+    page.clean()
+
+    def field():
+        global Black_list, white_list
+        def trigger_main():
+
+            main(page)
+        process = normalize(text.value)
+        for proc in psutil.process_iter(['name']):
+            list_names.append(normalize(proc.info['name']))
+        if check == "B":
+            checker = process + " " in Black_list
+        else:
+            checker = process + " " in white_list
+        page.clean()
+        if process not in list_names or checker:
+            page.add(ft.Text(
+                "Процесс не найден или уже ограничен. Проверьте, запущено ли приложение и повторите попытку. Если не помогло, убедитесь в правильности написания."),
+                     ft.Button("Вернуться в главное", on_click = trigger_main))
+            page.update()
+            return False
+        else:
+            def adding(check):
+                page.clean()
+                if check == "B":
+                    global Black_list
+                    Black_list.append(normalize(process) + " ")
+                    page.add(ft.Text("Процесс успешно добавлен!"),
+                             ft.Button("Вернуться в главное", on_click=trigger_main))
+                else:
+                    global white_list
+                    white_list.append(normalize(process) + " ")
+                    page.add(ft.Text("Процесс успешно добавлен!"),
+                             ft.Button("Вернуться в главное", on_click = trigger_main))
+            def add_tr():
+                adding(check)
+            page.add(ft.Text("Процесс найден!"), ft.Text(normalize(process)), ft.Button("Вернуться в главное", on_click = trigger_main),
+                     ft.Button("Добавить в список", on_click = add_tr))
+            page.update()
+
+    text = ft.TextField(label="Желаемый процесс")
+    page.add(text, ft.Button("Подтвердить", on_click=field))
+
+
+def see_the_list(page):
+
+    page.clean()
+    cl = ft.Column(
+        spacing=2,
+        height=650,
+        width=500,
+        scroll=ft.ScrollMode.ALWAYS
+    )
+    count = 0
+    inner_list = []
+    for proc in psutil.process_iter(['name']):
+
+        if 'user' in proc.username().split('\\') and normalize(proc.name()) not in inner_list:
+            count += 1
+            inner_list.append(normalize(proc.name()))
+            cl.controls.append(ft.Text(str(count) + ". " + normalize(proc.name())))
+    page.add(ft.Container(cl, border=ft.Border.all(1)))
+    page.add(ft.Button("Вернуться в главное", on_click=main))
+    page.update()
