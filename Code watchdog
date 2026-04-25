@@ -1,0 +1,13 @@
+import os, sys, subprocess, time, psutil
+
+open("watchdog.pid", "w").write(str(os.getpid()))
+print("Watchdog Запущен")
+
+while True:
+    try:
+        if psutil.pid_exists(int(open("main.pid").read())):
+            time.sleep(1); continue
+    except: pass
+    print("Отслеживатель процессов упал, запускаю")
+    subprocess.Popen([sys.executable, "main.py"])
+    time.sleep(1)
